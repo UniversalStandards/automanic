@@ -1,0 +1,174 @@
+name: Auto Issue Management
+
+on:
+  issues:
+    types: [opened, edited, labeled]
+  pull_request:
+    types: [opened, edited, ready_for_review]
+
+jobs:
+  auto-label-issues:
+    if: github.event_name == 'issues' && github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Auto-label based on content
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const issue = context.payload.issue;
+          const title = issue.title.toLowerCase();
+          const body = issue.body ? issue.body.toLowerCase() : '';
+          
+          const labels = [];
+          
+          // Auto-label based on title/body content
+          if (title.includes('bug') || body.includes('error') || body.includes('broken')) {
+            labels.push('bug');
+          }
+          
+          if (title.includes('feature') || title.includes('enhancement') || body.includes('new feature')) {
+            labels.push('enhancement');
+          }
+          
+          if (title.includes('doc') || body.includes('documentation')) {
+            labels.push('documentation');
+          }
+          
+          if (title.includes('question') || body.includes('how to')) {
+            labels.push('question');
+          }
+          
+          if (title.includes('performance') || body.includes('slow') || body.includes('optimization')) {
+            labels.push('performance');
+          }
+          
+          // Determine priority
+          if (title.includes('critical') || title.includes('urgent') || body.includes('production')) {
+            labels.push('priority:high');
+          } else if (title.includes('minor') || body.includes('nice to have')) {
+            labels.push('priority:low');
+          } else {
+            labels.push('priority:medium');
+          }
+          
+          // Determine complexity
+          if (body.length > 1000 || body.includes('complex') || body.includes('architecture')) {
+            labels.push('complexity:high');
+          } else if (body.length < 200) {
+            labels.push('complexity:low');
+          } else {
+            labels.push('complexity:medium');
+          }
+          
+          if (labels.length > 0) {
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: labels
+            });
+          }
+
+  auto-assign-reviewers:
+    if: github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'ready_for_review')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+    - name: Auto-assign reviewers
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const pr = context.payload.pull_request;
+          const author = pr.user.login;
+          
+          // Define code owners/experts for different areas
+          const codeExperts = {
+            'python': ['expert1', 'expert2'],
+            'javascript': ['jsexpert1', 'jsexpert2'],
+            'docs': ['docexpert1'],
+            'infrastructure': ['infraexpert1'],
+            'security': ['securityexpert1']
+          };
+          
+          let reviewers = [];
+          const files = await github.rest.pulls.listFiles({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: pr.number
+          });
+          
+          const changedFiles = files.data.map(f => f.filename);
+          
+          // Assign reviewers based on changed files
+          if (changedFiles.some(f => f.endsWith('.py'))) {
+            reviewers.push(...codeExperts.python);
+          }
+          
+          if (changedFiles.some(f => f.endsWith('.js') || f.endsWith('.ts'))) {
+            reviewers.push(...codeExperts.javascript);
+          }
+          
+          if (changedFiles.some(f => f.includes('README') || f.includes('docs/'))) {
+            reviewers.push(...codeExperts.docs);
+          }
+          
+          if (changedFiles.some(f => f.includes('.github/') || f.includes('Dockerfile'))) {
+            reviewers.push(...codeExperts.infrastructure);
+          }
+          
+          // Remove duplicates and author
+          reviewers = [...new Set(reviewers)].filter(r => r !== author);
+          
+          if (reviewers.length > 0) {
+            await github.rest.pulls.requestReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              reviewers: reviewers.slice(0, 2) // Limit to 2 reviewers
+            });
+          }
+
+  auto-project-assignment:
+    if: github.event_name == 'issues' && github.event.action == 'labeled'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+    - name: Add to project board
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const issue = context.payload.issue;
+          const labels = issue.labels.map(l => l.name);
+          
+          // Add to different project columns based on labels
+          let columnId = null;
+          
+          if (labels.includes('bug')) {
+            // Add to "Bug Triage" column
+            columnId = process.env.BUG_COLUMN_ID;
+          } else if (labels.includes('enhancement')) {
+            // Add to "Feature Backlog" column
+            columnId = process.env.FEATURE_COLUMN_ID;
+          } else if (labels.includes('documentation')) {
+            // Add to "Documentation" column
+            columnId = process.env.DOCS_COLUMN_ID;
+          }
+          
+          if (columnId) {
+            console.log(`Adding issue ${issue.number} to project column ${columnId}`);
+            // Project board automation would go here
+            // This requires additional setup with project board IDs
+          }

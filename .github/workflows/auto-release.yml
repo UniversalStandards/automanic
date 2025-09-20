@@ -1,0 +1,143 @@
+name: Auto Release
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+
+jobs:
+  release:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install semantic-release
+      run: |
+        pip install python-semantic-release
+
+    - name: Generate changelog and release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        semantic-release version --define commit_parser=angular
+
+    - name: Create GitHub Release
+      if: env.NEW_VERSION
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          // Read changelog for this version
+          let changelog = '';
+          try {
+            changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
+          } catch (e) {
+            changelog = 'No changelog available';
+          }
+          
+          const tagName = process.env.NEW_VERSION;
+          
+          await github.rest.repos.createRelease({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            tag_name: tagName,
+            name: `Release ${tagName}`,
+            body: changelog,
+            draft: false,
+            prerelease: false
+          });
+
+  auto-merge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+    - name: Auto-merge dependabot PRs
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const query = `query($owner: String!, $repo: String!, $number: Int!) {
+            repository(owner: $owner, name: $repo) {
+              pullRequest(number: $number) {
+                id
+                mergeable
+                reviews(last: 10) {
+                  nodes {
+                    state
+                    author {
+                      login
+                    }
+                  }
+                }
+                commits(last: 1) {
+                  nodes {
+                    commit {
+                      checkSuites(last: 10) {
+                        nodes {
+                          state
+                          conclusion
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }`;
+          
+          const variables = {
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            number: context.issue.number,
+          };
+          
+          const result = await github.graphql(query, variables);
+          const pr = result.repository.pullRequest;
+          
+          if (!pr || pr.mergeable !== 'MERGEABLE') {
+            console.log('PR is not mergeable');
+            return;
+          }
+          
+          // Check if all checks pass
+          const checkSuites = pr.commits.nodes[0]?.commit.checkSuites.nodes || [];
+          const allChecksPassed = checkSuites.every(suite => 
+            suite.state === 'COMPLETED' && suite.conclusion === 'SUCCESS'
+          );
+          
+          if (!allChecksPassed) {
+            console.log('Not all checks have passed');
+            return;
+          }
+          
+          // Auto-merge dependabot PRs that pass all checks
+          if (context.actor === 'dependabot[bot]') {
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              merge_method: 'squash'
+            });
+            
+            console.log('Auto-merged dependabot PR');
+          }
