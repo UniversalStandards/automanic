@@ -38,6 +38,12 @@ jobs:
       run: |
         semantic-release version --define commit_parser=angular
 
+    - name: Set NEW_VERSION env var
+      id: set_new_version
+      run: |
+        if [ -f .semver ]; then
+          echo "NEW_VERSION=$(cat .semver)" >> $GITHUB_ENV
+        fi
     - name: Create GitHub Release
       if: env.NEW_VERSION
       uses: actions/github-script@v7
