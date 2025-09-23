@@ -92,12 +92,18 @@ jobs:
           const author = pr.user.login;
           
           // Define code owners/experts for different areas
+          // Reviewer usernames are now configurable via environment variables (comma-separated)
+          function getReviewers(envVar) {
+            return process.env[envVar]
+              ? process.env[envVar].split(',').map(s => s.trim()).filter(Boolean)
+              : [];
+          }
           const codeExperts = {
-            'python': ['expert1', 'expert2'],
-            'javascript': ['jsexpert1', 'jsexpert2'],
-            'docs': ['docexpert1'],
-            'infrastructure': ['infraexpert1'],
-            'security': ['securityexpert1']
+            'python': getReviewers('PYTHON_REVIEWERS'),
+            'javascript': getReviewers('JAVASCRIPT_REVIEWERS'),
+            'docs': getReviewers('DOCS_REVIEWERS'),
+            'infrastructure': getReviewers('INFRASTRUCTURE_REVIEWERS'),
+            'security': getReviewers('SECURITY_REVIEWERS')
           };
           
           let reviewers = [];
