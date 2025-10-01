@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -85,3 +86,31 @@ jobs:
       if: always()
       with:
         sarif_file: bandit-report.sarif
+  validate:
+    name: Validate repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Validate repository structure
+        run: |
+          echo "Validating repository structure..."
+          ls -la
+          
+          # Check that essential files exist
+          if [ -f "Trash 1" ]; then
+            echo "✓ License file (Trash 1) exists"
+          else
+            echo "✗ License file (Trash 1) missing"
+            exit 1
+          fi
+          
+          if [ -f "Trash 2" ]; then
+            echo "✓ README file (Trash 2) exists"
+          else
+            echo "✗ README file (Trash 2) missing"
+            exit 1
+          fi
+          
+          echo "Repository validation completed successfully"

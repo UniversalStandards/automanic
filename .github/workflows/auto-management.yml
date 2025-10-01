@@ -1,0 +1,76 @@
+name: Auto Issue Management
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  issues:
+    types: [opened, edited, labeled, unlabeled]
+
+jobs:
+  auto-merge:
+    name: Auto-merge pull requests
+    runs-on: ubuntu-latest
+    # Guard: only run on pull_request events where context.issue is available
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Auto-merge PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = context.issue.number;
+            
+            console.log(`Processing PR #${prNumber}`);
+            
+            // Get PR details
+            const pr = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: prNumber
+            });
+            
+            console.log(`PR title: ${pr.data.title}`);
+            console.log(`PR state: ${pr.data.state}`);
+            
+            // Auto-merge logic would go here
+            // For now, just log that we can access the PR number safely
+            console.log(`Auto-merge check completed for PR #${prNumber}`);
+
+  auto-label:
+    name: Auto-label issues and PRs
+    runs-on: ubuntu-latest
+    # This job can run on multiple event types
+    if: github.event_name == 'issues' || github.event_name == 'pull_request'
+    steps:
+      - name: Auto-label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            let issueNumber;
+            
+            // Handle different event types
+            if (github.event_name === 'issues') {
+              issueNumber = context.payload.issue.number;
+            } else if (github.event_name === 'pull_request') {
+              issueNumber = context.payload.pull_request.number;
+            }
+            
+            if (issueNumber) {
+              console.log(`Processing item #${issueNumber} for auto-labeling`);
+            }
+
+  push-handler:
+    name: Handle push events
+    runs-on: ubuntu-latest
+    # This job only runs on push events
+    if: github.event_name == 'push'
+    steps:
+      - name: Handle push
+        run: |
+          echo "Handling push event to ${{ github.ref }}"
+          echo "Commit SHA: ${{ github.sha }}"
+          # Push-specific logic goes here
+          # Note: context.issue is NOT available in push events
