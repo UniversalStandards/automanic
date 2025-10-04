@@ -1,4 +1,8 @@
 name: Auto Issue Management
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
 
 on:
   push:
