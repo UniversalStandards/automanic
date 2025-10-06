@@ -1,232 +1,27 @@
 name: Auto Issue Management
-permissions:
-  contents: read
-  issues: write
-  pull-requests: write
 
 on:
   push:
     branches: [ main ]
   pull_request:
+    types: [opened, edited, ready_for_review]
     branches: [ main ]
   issues:
     types: [opened, edited, labeled, unlabeled]
 
 jobs:
-  auto-merge:
-    name: Auto-merge pull requests
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Auto-merge PR
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const prNumber = context.issue.number;
-            console.log(`Processing PR #${prNumber}`);
-            const pr = await github.rest.pulls.get({
-              owner,
-              repo,
-              pull_number: prNumber
-            });
-            console.log(`PR title: ${pr.data.title}`);
-            console.log(`PR state: ${pr.data.state}`);
-            console.log(`Auto-merge check completed for PR #${prNumber}`);
-
-  auto-label:
-    name: Auto-label issues and PRs
-    runs-on: ubuntu-latest
-    if: github.event_name == 'issues' || github.event_name == 'pull_request'
-    steps:
-      - name: Auto-label
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            let issueNumber;
-            if (github.event_name === 'issues') {
-              issueNumber = context.payload.issue.number;
-            } else if (github.event_name === 'pull_request') {
-              issueNumber = context.payload.pull_request.number;
-            }
-            
-            if (issueNumber) {
-              console.log(`Processing item #${issueNumber} for auto-labeling`);
-            }
-
   push-handler:
     name: Handle push events
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: github.event_name == 'push'
     steps:
       - name: Handle push
         run: |
           echo "Handling push event to ${{ github.ref }}"
           echo "Commit SHA: ${{ github.sha }}"
-          # Push-specific logic goes here
-          # Note: context.issue is NOT available in push events
 
-  auto-label-issues:
-    if: github.event_name == 'issues' && github.event.action == 'opened'
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-      contents: read
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    - name: Auto-label based on content
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const issue = context.payload.issue;
-          const title = issue.title.toLowerCase();
-          const body = issue.body ? issue.body.toLowerCase() : '';
-          const labels = [];
-          if (title.includes('bug') || body.includes('error') || body.includes('broken')) {
-            labels.push('bug');
-          }
-          if (title.includes('feature') || title.includes('enhancement') || body.includes('new feature')) {
-            labels.push('enhancement');
-          }
-          if (title.includes('doc') || body.includes('documentation')) {
-            labels.push('documentation');
-          }
-          if (title.includes('question') || body.includes('how to')) {
-            labels.push('question');
-          }
-          if (title.includes('performance') || body.includes('slow') || body.includes('optimization')) {
-            labels.push('performance');
-          }
-          if (title.includes('critical') || title.includes('urgent') || body.includes('production')) {
-            labels.push('priority:high');
-          } else if (title.includes('minor') || body.includes('nice to have')) {
-            labels.push('priority:low');
-          } else {
-            labels.push('priority:medium');
-          }
-          if (body.length > 1000 || body.includes('complex') || body.includes('architecture')) {
-            labels.push('complexity:high');
-          } else if (body.length < 200) {
-            labels.push('complexity:low');
-          } else {
-            labels.push('complexity:medium');
-          }
-          if (labels.length > 0) {
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue.number,
-              labels: labels
-            });
-          }
-
-  auto-assign-reviewers:
-    if: github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'ready_for_review')
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-      contents: read
-
-    steps:
-    - name: Auto-assign reviewers
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const pr = context.payload.pull_request;
-          const author = pr.user.login;
-          function getReviewers(envVar) {
-            return process.env[envVar]
-              ? process.env[envVar].split(',').map(s => s.trim()).filter(Boolean)
-              : [];
-          }
-          const codeExperts = {
-            'python': getReviewers('PYTHON_REVIEWERS'),
-            'javascript': getReviewers('JAVASCRIPT_REVIEWERS'),
-            'docs': getReviewers('DOCS_REVIEWERS'),
-            'infrastructure': getReviewers('INFRASTRUCTURE_REVIEWERS'),
-            'security': getReviewers('SECURITY_REVIEWERS')
-          };
-          let reviewers = [];
-          const files = await github.rest.pulls.listFiles({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            pull_number: pr.number
-          });
-          const changedFiles = files.data.map(f => f.filename);
-          if (changedFiles.some(f => f.endsWith('.py'))) {
-            reviewers.push(...codeExperts.python);
-          }
-          if (changedFiles.some(f => f.endsWith('.js') || f.endsWith('.ts'))) {
-            reviewers.push(...codeExperts.javascript);
-          }
-          if (changedFiles.some(f => f.includes('README') || f.includes('docs/'))) {
-            reviewers.push(...codeExperts.docs);
-          }
-          if (changedFiles.some(f => f.includes('.github/') || f.includes('Dockerfile'))) {
-            reviewers.push(...codeExperts.infrastructure);
-          }
-          reviewers = [...new Set(reviewers)].filter(r => r !== author);
-          if (reviewers.length > 0) {
-            await github.rest.pulls.requestReviewers({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr.number,
-              reviewers: reviewers.slice(0, 2)
-            });
-          }
-
-  auto-project-assignment:
-    if: github.event_name == 'issues' && github.event.action == 'labeled'
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-      contents: read
-
-    steps:
-    - name: Add to project board
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const issue = context.payload.issue;
-          const labels = issue.labels.map(l => l.name);
-          let columnId = null;
-          if (labels.includes('bug')) {
-            columnId = process.env.BUG_COLUMN_ID;
-          } else if (labels.includes('enhancement')) {
-            columnId = process.env.FEATURE_COLUMN_ID;
-          } else if (labels.includes('documentation')) {
-            columnId = process.env.DOCS_COLUMN_ID;
-          }
-          if (columnId) {
-            console.log(`Adding issue ${issue.number} to project column ${columnId}`);
-            // Project board automation would go here
-            // This requires additional setup with project board IDs
-          }
-
-  push-handler:
-    name: Handle push events
-    runs-on: ubuntu-latest
-    # This job only runs on push events
-    if: github.event_name == 'push'
-    steps:
-      - name: Handle push
-        run: |
-          echo "Handling push event to ${{ github.ref }}"
-          echo "Commit SHA: ${{ github.sha }}"
-          # Push-specific logic goes here
-          # Note: context.issue is NOT available in push events
-
-on:
-  issues:
-    types: [opened, edited, labeled]
-  pull_request:
-    types: [opened, edited, ready_for_review]
-
-jobs:
   auto-label-issues:
     if: github.event_name == 'issues' && github.event.action == 'opened'
     runs-on: ubuntu-latest
@@ -312,7 +107,7 @@ jobs:
           const author = pr.user.login;
           
           // Define code owners/experts for different areas
-          // Reviewer usernames are now configurable via environment variables (comma-separated)
+          // Reviewer usernames are configurable via environment variables (comma-separated)
           function getReviewers(envVar) {
             return process.env[envVar]
               ? process.env[envVar].split(',').map(s => s.trim()).filter(Boolean)
@@ -360,7 +155,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: pr.number,
-              reviewers: reviewers.slice(0, 2) // Limit to 2 reviewers
+              reviewers: reviewers.slice(0, 2)
             });
           }
 
@@ -383,13 +178,10 @@ jobs:
           let columnId = null;
           
           if (labels.includes('bug')) {
-            // Add to "Bug Triage" column
             columnId = process.env.BUG_COLUMN_ID;
           } else if (labels.includes('enhancement')) {
-            // Add to "Feature Backlog" column
             columnId = process.env.FEATURE_COLUMN_ID;
           } else if (labels.includes('documentation')) {
-            // Add to "Documentation" column
             columnId = process.env.DOCS_COLUMN_ID;
           }
           
@@ -398,4 +190,3 @@ jobs:
             // Project board automation would go here
             // This requires additional setup with project board IDs
           }
-  # End of workflow file
