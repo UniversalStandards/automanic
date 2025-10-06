@@ -24,9 +24,9 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.12'
 
     - name: Install semantic-release
       run: |
@@ -36,7 +36,7 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        semantic-release version --define commit_parser=angular
+        semantic-release version
 
     - name: Set NEW_VERSION env var
       id: set_new_version
