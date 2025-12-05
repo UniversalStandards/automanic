@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
     Button,
     TextField,
@@ -13,7 +13,8 @@ import {
     CardContent,
     Chip,
     Stack,
-    Divider
+    Divider,
+    Snackbar
 } from '@mui/material';
 
 interface Question {
@@ -102,6 +103,8 @@ const SetupForm: React.FC = () => {
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [isComplete, setIsComplete] = useState(false);
     const [generatedConfig, setGeneratedConfig] = useState<string>('');
+    const [copySuccess, setCopySuccess] = useState(false);
+    const [copyError, setCopyError] = useState(false);
 
     const generateConfiguration = useCallback(() => {
         const configLines = [
@@ -134,8 +137,13 @@ const SetupForm: React.FC = () => {
         }));
     }, [currentStep]);
 
-    const handleCopyToClipboard = useCallback(() => {
-        navigator.clipboard.writeText(generatedConfig);
+    const handleCopyToClipboard = useCallback(async () => {
+        try {
+            await navigator.clipboard.writeText(generatedConfig);
+            setCopySuccess(true);
+        } catch (err) {
+            setCopyError(true);
+        }
     }, [generatedConfig]);
 
     const handleReset = useCallback(() => {
@@ -147,6 +155,14 @@ const SetupForm: React.FC = () => {
 
     const progress = ((currentStep + 1) / questions.length) * 100;
     const currentQuestion = questions[currentStep];
+
+    // Memoize the answer chips to avoid recalculating on every render
+    const answerChips = useMemo(() => 
+        Object.entries(answers).map(([key, value]) => (
+            <Chip key={key} label={`${key}: ${value}`} size="small" color="primary" variant="outlined" sx={{ m: 0.5 }} />
+        )),
+        [answers]
+    );
 
     if (isComplete) {
         return (
@@ -165,9 +181,7 @@ const SetupForm: React.FC = () => {
                 <Card variant="outlined" sx={{ mb: 3, bgcolor: 'grey.50' }}>
                     <CardContent>
                         <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
-                            {Object.entries(answers).map(([key, value]) => (
-                                <Chip key={key} label={`${key}: ${value}`} size="small" color="primary" variant="outlined" />
-                            ))}
+                            {answerChips}
                         </Stack>
                         <Divider sx={{ my: 2 }} />
                         <pre style={{ overflow: 'auto', fontSize: '0.875rem', margin: 0 }}>
@@ -194,6 +208,19 @@ const SetupForm: React.FC = () => {
                         Start Over
                     </Button>
                 </Stack>
+
+                <Snackbar
+                    open={copySuccess}
+                    autoHideDuration={3000}
+                    onClose={() => setCopySuccess(false)}
+                    message="Configuration copied to clipboard!"
+                />
+                <Snackbar
+                    open={copyError}
+                    autoHideDuration={3000}
+                    onClose={() => setCopyError(false)}
+                    message="Failed to copy. Please copy manually."
+                />
             </Paper>
         );
     }

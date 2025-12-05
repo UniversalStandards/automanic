@@ -4,7 +4,10 @@ import App from './App';
 import './styles.css';
 
 const container = document.getElementById('root');
-const root = createRoot(container!);
+if (!container) {
+    throw new Error('Root element not found. Make sure there is a <div id="root"></div> in your HTML.');
+}
+const root = createRoot(container);
 root.render(
     <React.StrictMode>
         <App />
