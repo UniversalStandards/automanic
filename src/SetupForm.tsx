@@ -3,7 +3,6 @@ import {
     Button,
     TextField,
     Typography,
-    Box,
     LinearProgress,
     Paper,
     Stepper,
@@ -104,6 +103,15 @@ const SetupForm: React.FC = () => {
     const [isComplete, setIsComplete] = useState(false);
     const [generatedConfig, setGeneratedConfig] = useState<string>('');
 
+    const generateConfiguration = useCallback(() => {
+        const configLines = [
+            '<!-- AUTOMANIC-CONFIG-START -->',
+            ...questions.map(q => `${q.key}: ${answers[q.key] || 'none'}`),
+            '<!-- AUTOMANIC-CONFIG-END -->'
+        ];
+        setGeneratedConfig(configLines.join('\n'));
+    }, [answers]);
+
     const handleNext = useCallback(() => {
         if (currentStep < questions.length - 1) {
             setCurrentStep(currentStep + 1);
@@ -111,7 +119,7 @@ const SetupForm: React.FC = () => {
             generateConfiguration();
             setIsComplete(true);
         }
-    }, [currentStep, answers]);
+    }, [currentStep, generateConfiguration]);
 
     const handleBack = useCallback(() => {
         if (currentStep > 0) {
@@ -125,15 +133,6 @@ const SetupForm: React.FC = () => {
             [questions[currentStep].key]: value
         }));
     }, [currentStep]);
-
-    const generateConfiguration = useCallback(() => {
-        const configLines = [
-            '<!-- AUTOMANIC-CONFIG-START -->',
-            ...questions.map(q => `${q.key}: ${answers[q.key] || 'none'}`),
-            '<!-- AUTOMANIC-CONFIG-END -->'
-        ];
-        setGeneratedConfig(configLines.join('\n'));
-    }, [answers]);
 
     const handleCopyToClipboard = useCallback(() => {
         navigator.clipboard.writeText(generatedConfig);
