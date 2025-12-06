@@ -46,7 +46,7 @@ jobs:
         fi
     - name: Create GitHub Release
       if: env.NEW_VERSION
-      uses: actions/github-script@v7
+      uses: actions/github-script@v8
       with:
         script: |
           const fs = require('fs');
@@ -79,7 +79,7 @@ jobs:
 
     steps:
     - name: Auto-merge dependabot PRs
-      uses: actions/github-script@v7
+      uses: actions/github-script@v8
       with:
         script: |
           const query = `query($owner: String!, $repo: String!, $number: Int!) {
