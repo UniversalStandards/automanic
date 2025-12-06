@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+  "defaults": {
+    "PROJECT_TYPE": "web-app",
+    "LANGUAGE": "python",
+    "FRAMEWORK": "none",
+    "BUILD_SYSTEM": "pip",
+    "DATABASE": "none",
+    "DEPLOYMENT": "docker",
+    "CI_CD": "github-actions",
+    "TESTING": "pytest",
+    "LICENSE_TYPE": "mit",
+    "VISIBILITY": "public"
+  },
+  "validation": {
+    "strict": true,
+    "requireAllFields": true
+  },
+  "output": {
+    "directory": ".",
+    "overwrite": false,
+    "createGitIgnore": true,
+    "createEditorConfig": true
+  }
+}

@@ -1,4 +1,10 @@
-```python
+#!/usr/bin/env python3
+"""
+Automanic Setup Script
+
+Main entry point for setting up projects using Automanic.
+"""
+
 import os
 import re
 import json
