@@ -7,13 +7,13 @@
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
     "@mui/material": "^7.3.6",
-    "react": "^19.2.1",
+    "react": "^19.2.4",
     "react-dom": "^19.2.1",
     "react-scripts": "5.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
-    "@types/react": "^19.2.7",
+    "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
     "gh-pages": "^6.1.0",
     "typescript": "^5.9.3"
